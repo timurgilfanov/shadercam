@@ -1,7 +1,12 @@
 package com.androidexperiments.shadercam.example;
 
 import android.Manifest;
+import android.content.Context;
+import android.content.res.AssetManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
+import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v4.app.FragmentActivity;
@@ -14,12 +19,15 @@ import android.widget.Button;
 import android.widget.Toast;
 
 import com.androidexperiments.shadercam.example.gl.ExampleRenderer;
+import com.androidexperiments.shadercam.example.gl.TextRenderer;
 import com.androidexperiments.shadercam.fragments.CameraFragment;
 import com.androidexperiments.shadercam.fragments.PermissionsHelper;
 import com.androidexperiments.shadercam.gl.CameraRenderer;
 import com.androidexperiments.shadercam.utils.ShaderUtils;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 
 import butterknife.ButterKnife;
@@ -28,11 +36,10 @@ import butterknife.OnClick;
 
 /**
  * Written by Anthony Tripaldi
- *
+ * <p>
  * Very basic implemention of shader camera.
  */
-public class SimpleShaderActivity extends FragmentActivity implements CameraRenderer.OnRendererReadyListener, PermissionsHelper.PermissionsListener
-{
+public class SimpleShaderActivity extends FragmentActivity implements CameraRenderer.OnRendererReadyListener, PermissionsHelper.PermissionsListener {
     private static final String TAG = SimpleShaderActivity.class.getSimpleName();
     private static final String TAG_CAMERA_FRAGMENT = "tag_camera_frag";
 
@@ -44,8 +51,10 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
     /**
      * We inject our views from our layout xml here using {@link ButterKnife}
      */
-    @InjectView(R.id.texture_view) TextureView mTextureView;
-    @InjectView(R.id.btn_record) Button mRecordBtn;
+    @InjectView(R.id.texture_view)
+    TextureView mTextureView;
+    @InjectView(R.id.btn_record)
+    Button mRecordBtn;
 
     /**
      * Custom fragment used for encapsulating all the {@link android.hardware.camera2} apis.
@@ -65,10 +74,10 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
 
     private PermissionsHelper mPermissionsHelper;
     private boolean mPermissionsSatisfied = false;
+    protected GLSurfaceView glView;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState)
-    {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -78,15 +87,12 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
         setupInteraction();
 
         //setup permissions for M or start normally
-        if(PermissionsHelper.isMorHigher())
-            setupPermissions();
+        if (PermissionsHelper.isMorHigher()) setupPermissions();
     }
 
     private void setupPermissions() {
         mPermissionsHelper = PermissionsHelper.attach(this);
-        mPermissionsHelper.setRequestedPermissions(
-                Manifest.permission.CAMERA,
-                Manifest.permission.RECORD_AUDIO,
+        mPermissionsHelper.setRequestedPermissions(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
 
         );
@@ -95,13 +101,12 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
     /**
      * create the camera fragment responsible for handling camera state and add it to our activity
      */
-    private void setupCameraFragment()
-    {
-        if(mCameraFragment != null && mCameraFragment.isAdded())
-            return;
+    private void setupCameraFragment() {
+        if (mCameraFragment != null && mCameraFragment.isAdded()) return;
 
         mCameraFragment = CameraFragment.getInstance();
-        mCameraFragment.setCameraToUse(CameraFragment.CAMERA_PRIMARY); //pick which camera u want to use, we default to forward
+        mCameraFragment.setCameraToUse(
+                CameraFragment.CAMERA_PRIMARY); //pick which camera u want to use, we default to forward
         mCameraFragment.setTextureView(mTextureView);
 
         //add fragment to our setup and let it work its magic
@@ -118,7 +123,7 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
         mTextureView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if(mRenderer instanceof ExampleRenderer) {
+                if (mRenderer instanceof ExampleRenderer) {
                     ((ExampleRenderer) mRenderer).setTouchPoint(event.getRawX(), event.getRawY());
                     return true;
                 }
@@ -140,13 +145,15 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
     /**
      * User did not grant the permissions needed for out app, so we show a quick toast and kill the
      * activity before it can continue onward.
+     *
      * @param failedPermissions string array of which permissions were denied
      */
     @Override
     public void onPermissionsFailed(String[] failedPermissions) {
         Log.e(TAG, "onPermissionsFailed()" + Arrays.toString(failedPermissions));
         mPermissionsSatisfied = false;
-        Toast.makeText(this, "shadercam needs all permissions to function, please try again.", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "shadercam needs all permissions to function, please try again.", Toast.LENGTH_LONG)
+                .show();
         this.finish();
     }
 
@@ -166,14 +173,13 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
          * being called prematurely
          */
         //
-        if(PermissionsHelper.isMorHigher() && !mPermissionsSatisfied) {
-            if(!mPermissionsHelper.checkPermissions())
-                return;
+        if (PermissionsHelper.isMorHigher() && !mPermissionsSatisfied) {
+            if (!mPermissionsHelper.checkPermissions()) return;
             else
                 mPermissionsSatisfied = true; //extra helper as callback sometimes isnt quick enough for future results
         }
 
-        if(!mTextureView.isAvailable())
+        if (!mTextureView.isAvailable())
             mTextureView.setSurfaceTextureListener(mTextureListener); //set listener to handle when its ready
         else
             setReady(mTextureView.getSurfaceTexture(), mTextureView.getWidth(), mTextureView.getHeight());
@@ -192,26 +198,23 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
      * easier than ever with the {@link OnClick} annotation.
      */
     @OnClick(R.id.btn_record)
-    public void onClickRecord()
-    {
-        if(mRenderer.isRecording())
-            stopRecording();
-        else
-            startRecording();
+    public void onClickRecord() {
+        if (mRenderer.isRecording()) stopRecording();
+        else startRecording();
     }
 
     @OnClick(R.id.btn_swap_camera)
-    public void onClickSwapCamera()
-    {
+    public void onClickSwapCamera() {
         mCameraFragment.swapCamera();
     }
 
     /**
      * called whenever surface texture becomes initially available or whenever a camera restarts after
      * completed recording or resuming from onpause
+     *
      * @param surface {@link SurfaceTexture} that we'll be drawing into
-     * @param width width of the surface texture
-     * @param height height of the surface texture
+     * @param width   width of the surface texture
+     * @param height  height of the surface texture
      */
     protected void setReady(SurfaceTexture surface, int width, int height) {
         mRenderer = getRenderer(surface, width, height);
@@ -221,6 +224,22 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
 
         //initial config if needed
         mCameraFragment.configureTransform(width, height);
+        if (mRenderer instanceof TextRenderer)
+            ((TextRenderer) mRenderer).onSurfaceChanged(width, height);
+    }
+
+    private Bitmap getBitmapFromAssets(Context context, String fileName) {
+        AssetManager asset = context.getAssets();
+        InputStream is;
+        try {
+            is = asset.open(fileName);
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            Bitmap bit = BitmapFactory.decodeStream(is, null, options);
+            return bit;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     /**
@@ -228,17 +247,15 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
      * recording with any shader.
      */
     protected CameraRenderer getRenderer(SurfaceTexture surface, int width, int height) {
-        return new ExampleRenderer(this, surface, width, height);
+        return new CameraRenderer(this, surface, width, height);
     }
 
-    private void startRecording()
-    {
+    private void startRecording() {
         mRenderer.startRecording(getVideoFile());
         mRecordBtn.setText("Stop");
     }
 
-    private void stopRecording()
-    {
+    private void stopRecording() {
         mRenderer.stopRecording();
         mRecordBtn.setText("Record");
 
@@ -248,22 +265,21 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
         Toast.makeText(this, "File recording complete: " + getVideoFile().getAbsolutePath(), Toast.LENGTH_LONG).show();
     }
 
-    private File getVideoFile()
-    {
+    private File getVideoFile() {
         return new File(Environment.getExternalStorageDirectory(), TEST_VIDEO_FILE_NAME);
     }
 
     /**
      * kills the camera in camera fragment and shutsdown render thread
+     *
      * @param restart whether or not to restart the camera after shutdown is complete
      */
-    private void shutdownCamera(boolean restart)
-    {
+    private void shutdownCamera(boolean restart) {
         //make sure we're here in a working state with proper permissions when we kill the camera
-        if(PermissionsHelper.isMorHigher() && !mPermissionsSatisfied) return;
+        if (PermissionsHelper.isMorHigher() && !mPermissionsSatisfied) return;
 
         //check to make sure we've even created the cam and renderer yet
-        if(mCameraFragment == null || mRenderer == null) return;
+        if (mCameraFragment == null || mRenderer == null) return;
 
         mCameraFragment.closeCamera();
 
@@ -277,7 +293,7 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
      * interface. Since these are being called from inside the CameraRenderer thread, we need to make sure
      * that we call our methods from the {@link #runOnUiThread(Runnable)} method, so that we don't
      * throw any exceptions about touching the UI from non-UI threads.
-     *
+     * <p>
      * Another way to handle this would be to create a Handler/Message system similar to how our
      * {@link com.androidexperiments.shadercam.gl.CameraRenderer.RenderHandler} works.
      */
@@ -310,17 +326,18 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
      * {@link android.view.TextureView.SurfaceTextureListener} responsible for setting up the rest of the
      * rendering and recording elements once our TextureView is good to go.
      */
-    private TextureView.SurfaceTextureListener mTextureListener = new TextureView.SurfaceTextureListener()
-        {
-            @Override
-            public void onSurfaceTextureAvailable(SurfaceTexture surface, final int width, final int height) {
-                //convenience method since we're calling it from two places
-                setReady(surface, width, height);
-            }
+    private TextureView.SurfaceTextureListener mTextureListener = new TextureView.SurfaceTextureListener() {
+        @Override
+        public void onSurfaceTextureAvailable(SurfaceTexture surface, final int width, final int height) {
+            //convenience method since we're calling it from two places
+            setReady(surface, width, height);
+        }
 
         @Override
         public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
             mCameraFragment.configureTransform(width, height);
+            if (mRenderer instanceof TextRenderer)
+                ((TextRenderer) mRenderer).onSurfaceChanged(width, height);
         }
 
         @Override
@@ -329,7 +346,8 @@ public class SimpleShaderActivity extends FragmentActivity implements CameraRend
         }
 
         @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) { }
+        public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {
+        }
     };
 
 }

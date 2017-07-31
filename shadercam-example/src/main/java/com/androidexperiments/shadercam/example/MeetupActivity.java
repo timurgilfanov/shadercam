@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.widget.SeekBar;
 
 import com.androidexperiments.shadercam.example.gl.SuperAwesomeRenderer;
+import com.androidexperiments.shadercam.example.gl.TextRenderer;
 import com.androidexperiments.shadercam.gl.CameraRenderer;
 
 /**
@@ -12,7 +13,7 @@ import com.androidexperiments.shadercam.gl.CameraRenderer;
  * implementation of ShaderCam, with sliders
  */
 public class MeetupActivity extends SimpleShaderActivity implements SeekBar.OnSeekBarChangeListener {
-    private SuperAwesomeRenderer mMyRenderer;
+    private CameraRenderer mMyRenderer;
     private SeekBar mSeekbar;
 
     @Override
@@ -25,13 +26,14 @@ public class MeetupActivity extends SimpleShaderActivity implements SeekBar.OnSe
 
     @Override
     protected CameraRenderer getRenderer(SurfaceTexture surface, int width, int height) {
-        mMyRenderer = new SuperAwesomeRenderer(this, surface, width, height);
+        mMyRenderer = new TextRenderer(this, surface, width, height);
         return mMyRenderer;
     }
 
     @Override
     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-        mMyRenderer.setTileAmount(map(progress, 0.f, 100.f, 0.1f, 1.9f));
+        if (mMyRenderer instanceof SuperAwesomeRenderer)
+            ((SuperAwesomeRenderer) mMyRenderer).setTileAmount(map(progress, 0.f, 100.f, 0.1f, 1.9f));
     }
 
     @Override
@@ -47,7 +49,7 @@ public class MeetupActivity extends SimpleShaderActivity implements SeekBar.OnSe
     /**
      * Takes a value, assumes it falls between start1 and stop1, and maps it to a value
      * between start2 and stop2.
-     *
+     * <p>
      * For example, above, our slide goes 0-100, starting at 50. We map 0 on the slider
      * to .1f and 100 to 1.9f, in order to better suit our shader calculations
      */

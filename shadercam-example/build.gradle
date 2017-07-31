@@ -28,4 +28,5 @@ dependencies {
     compile project(':shadercam')
     compile 'com.android.support:appcompat-v7:25.3.1' //for theming
     compile 'com.jakewharton:butterknife:6.1.0' //dependency injection
+    compile group: 'net.sourceforge.streamsupport', name: 'streamsupport', version: '1.5.3'
 }
